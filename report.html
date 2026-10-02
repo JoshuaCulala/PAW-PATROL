@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report - PAW PATROL</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800&display=swap" rel="stylesheet">
+<style>body{font-family:'Inter',sans-serif}</style>
+</head>
+<body class="bg-[#fffdf8] min-h-screen p-6">
+<nav class="max-w-2xl mx-auto flex justify-between items-center"><a href="index.html" class="bg-white border px-4 py-2 rounded-full text-xs font-bold">← Back</a><span class="text-xs text-zinc-400 font-bold tracking-widest">REPORT FORM</span></nav>
+<form id="reportForm" class="max-w-2xl mx-auto mt-8 bg-white border border-black/5 rounded-[20px] p-8 shadow-sm">
+  <h1 class="text-2xl font-extrabold">Report a sighting</h1>
+  <p class="text-xs text-zinc-500 mt-1">Please upload a clear photo of the stray.</p>
+  <div class="mt-6">
+    <label class="text-[11px] font-bold text-zinc-500 tracking-widest">UPLOAD PICTURE *</label>
+    <div id="uploadBox" class="w-full border-2 border-dashed border-zinc-200 rounded-xl mt-2 p-6 text-center cursor-pointer hover:border-black bg-zinc-50/50">
+      <input type="file" id="photo" accept="image/*" required class="hidden">
+      <div id="uploadText"><p class="text-3xl">📸</p><p class="text-sm font-bold mt-2">Click to upload picture</p><p class="text-[11px] text-zinc-400 mt-1">JPG, PNG up to 5MB</p></div>
+      <img id="preview" class="hidden w-full h-48 object-cover rounded-xl mx-auto mt-2">
+      <p id="fileName" class="hidden text-xs font-bold mt-2"></p>
+    </div>
+  </div>
+  <div class="grid md:grid-cols-2 gap-4 mt-6">
+    <div><label class="text-[11px] font-bold text-zinc-500 tracking-widest">LOCATION</label><input id="location" required class="w-full border rounded-xl px-4 py-3 mt-1 text-sm outline-none focus:border-black" placeholder="e.g., CE Building"></div>
+    <div><label class="text-[11px] font-bold text-zinc-500 tracking-widest">TYPE</label><select id="type" class="w-full border rounded-xl px-4 py-3 mt-1 text-sm"><option>Dog 🐶</option><option>Cat 🐱</option><option>Others</option></select></div>
+    <div><label class="text-[11px] font-bold text-zinc-500 tracking-widest">CONDITION</label><select id="condition" class="w-full border rounded-xl px-4 py-3 mt-1 text-sm"><option>Healthy</option><option>Injured</option><option>Needs Food</option></select></div>
+    <div><label class="text-[11px] font-bold text-zinc-500 tracking-widest">URGENCY</label><select id="urgency" class="w-full border rounded-xl px-4 py-3 mt-1 text-sm"><option>High</option><option>Medium</option><option>Low</option></select></div>
+  </div>
+  <label class="text-[11px] font-bold text-zinc-500 tracking-widest mt-4 block">NOTES</label>
+  <textarea id="notes" class="w-full border rounded-xl p-4 mt-1 text-sm outline-none focus:border-black" rows="3" placeholder="Describe situation..."></textarea>
+  <button type="submit" class="w-full bg-black text-white py-3.5 rounded-full font-bold text-sm mt-6">Submit report →</button>
+</form>
+<script>
+let photoBase64 = "";
+document.getElementById('uploadBox').addEventListener('click', () => document.getElementById('photo').click());
+document.getElementById('photo').addEventListener('change', function(e){
+  const file = e.target.files[0]; if(!file) return;
+  document.getElementById('fileName').innerText = file.name;
+  document.getElementById('fileName').classList.remove('hidden');
+  const reader = new FileReader();
+  reader.onload = function(event){
+    photoBase64 = event.target.result;
+    const preview = document.getElementById('preview');
+    preview.src = photoBase64;
+    preview.classList.remove('hidden');
+    document.getElementById('uploadText').classList.add('hidden');
+    document.getElementById('uploadBox').classList.remove('border-dashed');
+    document.getElementById('uploadBox').classList.add('border-solid','border-black');
+  };
+  reader.readAsDataURL(file);
+});
+document.getElementById('reportForm').addEventListener('submit', e=>{
+  e.preventDefault();
+  if(!photoBase64){ alert('Please upload a picture!'); return; }
+  const reports=JSON.parse(localStorage.getItem('paw_reports')||'[]');
+  reports.unshift({id:Date.now(), photo: photoBase64, location:document.getElementById('location').value, type:document.getElementById('type').value, condition:document.getElementById('condition').value, urgency:document.getElementById('urgency').value, notes:document.getElementById('notes').value, time:new Date().toLocaleString(), status:'Pending'});
+  localStorage.setItem('paw_reports', JSON.stringify(reports));
+  alert('Report saved!'); window.location.href='admin.html';
+});
+</script>
+</body>
+</html>
