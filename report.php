@@ -4,7 +4,12 @@ requireLogin();
 require_once __DIR__ . '/backend/config.php';
 
 $error = trim((string) ($_GET['error'] ?? ''));
-$success = isset($_GET['success']);
+// Issue 18: Use session flash for success instead of GET parameter
+$success = false;
+if (!empty($_SESSION['flash_success'])) {
+    $success = $_SESSION['flash_success'];
+    unset($_SESSION['flash_success']);
+}
 
 function iniSizeInBytes(string $value): int
 {
@@ -53,12 +58,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $photo = $_FILES['photo'] ?? null;
         $allowedMimeTypes = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
 
-        if ($location === '' || mb_strlen($location) > 150
+        if ($location === '' || mb_strlen($location) < 3 || mb_strlen($location) > 150
             || !in_array($type, $allowedTypes, true)
             || !in_array($condition, $allowedConditions, true)
             || !in_array($urgency, $allowedUrgencies, true)
             || mb_strlen($notes) > 5000) {
             $error = 'Check the report details and try again.';
+        } elseif ($conn->query('SELECT id FROM reports WHERE user_id = ' . (int)$_SESSION['user_id'] . ' AND created_at > DATE_SUB(NOW(), INTERVAL 60 SECOND) LIMIT 1')->{'num_rows'} > 0) {
+            $error = 'You submitted a report less than 60 seconds ago. Please wait before submitting another.';
         } elseif (!is_array($photo) || !isset($photo['error']) || $photo['error'] !== UPLOAD_ERR_OK) {
             $uploadError = is_array($photo) ? ($photo['error'] ?? null) : null;
             $error = match ($uploadError) {
@@ -104,7 +111,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     );
                     $statement->send_long_data(1, $imageData);
                     $statement->execute();
-                    header('Location: report.php?success=1');
+                    $_SESSION['flash_success'] = 'Report saved. Thank you for helping!';
+                    header('Location: report.php');
                     exit;
                 } catch (mysqli_sql_exception $exception) {
                     error_log('Report creation failed: ' . $exception->getMessage());
@@ -139,7 +147,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   </div>
   <div class="mt-6 grid gap-4 md:grid-cols-2">
     <label class="text-[11px] font-bold tracking-widest text-zinc-500">LOCATION
-      <input name="location" maxlength="150" required class="mt-1 w-full rounded-xl border px-4 py-3 text-sm font-normal" placeholder="e.g., CE Building">
+      <input name="location" maxlength="150" minlength="3" required class="mt-1 w-full rounded-xl border px-4 py-3 text-sm font-normal" placeholder="e.g., CE Building">
     </label>
     <label class="text-[11px] font-bold tracking-widest text-zinc-500">TYPE
       <select name="type" class="mt-1 w-full rounded-xl border px-4 py-3 text-sm font-normal"><option value="Dog">Dog 🐶</option><option value="Cat">Cat 🐱</option><option value="Other">Other</option></select>
@@ -154,7 +162,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <label class="mt-4 block text-[11px] font-bold tracking-widest text-zinc-500">NOTES
     <textarea name="notes" maxlength="5000" class="mt-1 w-full rounded-xl border p-4 text-sm font-normal" rows="3" placeholder="Describe the situation..."></textarea>
   </label>
-  <button type="submit" class="mt-6 w-full rounded-full bg-black py-3.5 text-sm font-bold text-white">Submit report →</button>
+  <button id="reportSubmitBtn" type="submit" class="mt-6 w-full rounded-full bg-black py-3.5 text-sm font-bold text-white">Submit report →</button>
 </form>
+<script>
+document.getElementById('reportForm').addEventListener('submit', function(e) {
+  var btn = document.getElementById('reportSubmitBtn');
+  if (btn.disabled) { e.preventDefault(); return; }
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+});
+</script>
 </body>
 </html>

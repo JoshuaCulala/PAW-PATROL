@@ -4,9 +4,13 @@ declare(strict_types=1);
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/config.php';
 
-function redirectWithError(string $message): never
+function redirectWithError(string $message, string $form = ''): never
 {
-    header('Location: ../index.php?error=' . rawurlencode($message));
+    $url = '../login.php?error=' . rawurlencode($message);
+    if ($form !== '') {
+        $url .= '&form=' . rawurlencode($form);
+    }
+    header('Location: ' . $url);
     exit;
 }
 
@@ -31,17 +35,17 @@ if ($action === 'register') {
     $name = trim((string) ($_POST['name'] ?? ''));
     $confirmPassword = (string) ($_POST['confirm_password'] ?? '');
 
-    if ($name === '' || mb_strlen($name) > 100) {
-        redirectWithError('Enter your name (up to 100 characters).');
+    if ($name === '' || mb_strlen($name) < 2 || mb_strlen($name) > 100) {
+        redirectWithError('Enter your name (at least 2 characters, up to 100).', 'register');
     }
     if (strlen($password) < 8) {
-        redirectWithError('Choose a password with at least 8 characters.');
+        redirectWithError('Choose a password with at least 8 characters.', 'register');
     }
     if (PASSWORD_DEFAULT === PASSWORD_BCRYPT && strlen($password) > 72) {
-        redirectWithError('This server supports passwords up to 72 bytes. Choose a shorter password.');
+        redirectWithError('This server supports passwords up to 72 bytes. Choose a shorter password.', 'register');
     }
     if (!hash_equals($password, $confirmPassword)) {
-        redirectWithError('The passwords do not match.');
+        redirectWithError('The passwords do not match.', 'register');
     }
 
     try {
@@ -63,7 +67,7 @@ if ($action === 'register') {
         exit;
     } catch (mysqli_sql_exception $exception) {
         if ($exception->getCode() === 1062) {
-            redirectWithError('An account with that email already exists. Please sign in.');
+            redirectWithError('An account with that email already exists. Please sign in.', 'register');
         }
         error_log('Account registration failed: ' . $exception->getMessage());
         http_response_code(500);
@@ -72,6 +76,9 @@ if ($action === 'register') {
 }
 
 if ($action === 'login') {
+    if ($password === '') {
+        redirectWithError('Enter your password.');
+    }
     $statement = $conn->prepare(
         'SELECT id, name, email, password_hash, role FROM users WHERE email = ? LIMIT 1'
     );

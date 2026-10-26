@@ -43,11 +43,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $statement->bind_param('i', $reportId);
                         $statement->execute();
                     } else {
-                        $statement = $conn->prepare(
-                            "DELETE FROM rescued WHERE report_id = ? AND status = 'Available'"
-                        );
-                        $statement->bind_param('i', $reportId);
-                        $statement->execute();
+                        // Issue 11: Prevent reverting to Pending if pet has already been adopted
+                        $adoptCheck = $conn->prepare("SELECT id FROM rescued WHERE report_id = ? AND status = 'Adopted' LIMIT 1");
+                        $adoptCheck->bind_param('i', $reportId);
+                        $adoptCheck->execute();
+                        if ($adoptCheck->get_result()->num_rows > 0) {
+                            $conn->rollback();
+                            $transactionStarted = false;
+                            $error = 'This animal has already been adopted and cannot be reverted to pending.';
+                        } else {
+                            $statement = $conn->prepare(
+                                "DELETE FROM rescued WHERE report_id = ? AND status = 'Available'"
+                            );
+                            $statement->bind_param('i', $reportId);
+                            $statement->execute();
+                        }
                     }
 
                     $conn->commit();
@@ -125,7 +135,7 @@ $reports = $conn->query(
 <nav class="mx-auto flex max-w-5xl items-center justify-between rounded-full border bg-white px-5 py-3 shadow-sm">
   <a href="dashboard.php" class="text-sm font-bold">🐾 PAW PATROL <span class="font-normal text-zinc-400">Admin</span></a>
   <div class="flex gap-2">
-    <form method="post" onsubmit="return confirm('Permanently delete all reports and their pictures?')">
+    <form method="post" onsubmit="return confirm('Permanently delete ALL ' + document.querySelectorAll('article').length + ' reports and their pictures? This cannot be undone.')">
       <input type="hidden" name="csrf_token" value="<?= escape(csrfToken()) ?>">
       <input type="hidden" name="action" value="clear">
       <button class="rounded-full border px-4 py-2 text-xs font-bold">Clear reports</button>

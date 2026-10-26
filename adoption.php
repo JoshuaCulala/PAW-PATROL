@@ -4,7 +4,12 @@ requireLogin();
 require_once __DIR__ . '/backend/config.php';
 
 $error = '';
-$success = isset($_GET['success']);
+// Issue 19: Use session flash for success instead of GET parameter
+$success = false;
+if (!empty($_SESSION['flash_success'])) {
+    $success = $_SESSION['flash_success'];
+    unset($_SESSION['flash_success']);
+}
 
 try {
     $conn->query(
@@ -44,10 +49,22 @@ try {
                 $statement->execute();
 
                 if ($statement->affected_rows === 1) {
-                    header('Location: adoption.php?success=1');
+                    $_SESSION['flash_success'] = true;
+                    header('Location: adoption.php');
                     exit;
                 }
-                $error = 'This pet is no longer available for adoption.';
+                // Issue 13: Better adoption error messages
+                $checkAdopted = $conn->prepare("SELECT adopted_by FROM rescued WHERE id = ? LIMIT 1");
+                $checkAdopted->bind_param('i', $petId);
+                $checkAdopted->execute();
+                $adoptedRow = $checkAdopted->get_result()->fetch_assoc();
+                if ($adoptedRow && $adoptedRow['adopted_by'] == $userId) {
+                    $error = 'You have already adopted this pet.';
+                } elseif ($adoptedRow && $adoptedRow['adopted_by'] !== null) {
+                    $error = 'This pet has been adopted by someone else.';
+                } else {
+                    $error = 'This pet is no longer available for adoption.';
+                }
             }
         }
     }
@@ -99,7 +116,7 @@ try {
       </div>
     </div>
   <?php endforeach; endif; ?>
-  <div class="bg-yellow-300 border-2 border-black rounded-2xl p-6 shadow-[4px_4px_0px_black]"><p class="text-3xl">💛</p><p class="font-black text-lg mt-4 leading-none">Want to<br>adopt?</p><p class="text-xs font-medium mt-3">Visit OSA Office with 1 valid ID.</p><button class="w-full mt-6 bg-black text-white py-3 rounded-full text-xs font-bold">Contact OSA</button></div>
+  <div class="bg-yellow-300 border-2 border-black rounded-2xl p-6 shadow-[4px_4px_0px_black]"><p class="text-3xl">💛</p><p class="font-black text-lg mt-4 leading-none">Want to<br>adopt?</p><p class="text-xs font-medium mt-3">Visit OSA Office with 1 valid ID.</p><p class="w-full mt-6 text-center text-xs font-medium text-zinc-600">Visit the OSA Office in person with 1 valid ID to complete the adoption process.</p></div>
 </div>
 </body>
 </html>
